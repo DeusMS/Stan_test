@@ -1,0 +1,328 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('main');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const getTitle = () => {
+    if (activeTab === 'main') return 'Тандем-Пост';
+    if (activeTab === 'coilers') return 'Моталки';
+    return 'Пробеги';
+  };
+
+  return (
+    <div className="h-screen w-full bg-black text-white flex flex-col overflow-hidden font-sans select-none touch-manipulation">
+      {/* Боковое меню (Sidebar & Overlay) */}
+      <div 
+        className={`fixed inset-0 bg-black/70 z-40 transition-opacity duration-300 ${isMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setIsMenuOpen(false)}
+      ></div>
+      <div className={`fixed top-0 left-0 bottom-0 w-72 bg-[#1C1C1E] z-50 transform transition-transform duration-300 shadow-[5px_0_20px_rgba(0,0,0,0.5)] flex flex-col ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-4 py-6 text-xl font-bold border-b border-gray-800 text-center text-gray-200">
+          Меню
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {[
+            { id: 'main', label: 'Главная (Счетчик)' },
+            { id: 'coilers', label: 'Моталки (Свойства)' },
+            { id: 'mileage', label: 'Расчет пробегов' }
+          ].map(item => (
+            <div 
+              key={item.id}
+              className={`px-6 py-4 text-lg font-semibold cursor-pointer border-b border-gray-800 transition-colors ${activeTab === item.id ? 'bg-gray-800 text-white border-l-4 border-l-blue-500' : 'text-gray-400 active:bg-gray-800'}`}
+              onClick={() => {
+                setActiveTab(item.id);
+                setIsMenuOpen(false);
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Навбар (Navbar) */}
+      <div className="flex-shrink-0 h-14 bg-[#1C1C1E] flex items-center px-4 relative border-b border-gray-800">
+        <button 
+          onClick={() => setIsMenuOpen(true)}
+          className="text-blue-500 p-2 -ml-2 active:opacity-50"
+        >
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex-1 text-center font-bold text-lg mr-7">
+          {getTitle()}
+        </div>
+      </div>
+
+      {/* Основной контент */}
+      <div className="flex-1 overflow-hidden relative">
+        {activeTab === 'main' && <MainTab />}
+        {activeTab === 'coilers' && <CoilersTab />}
+        {activeTab === 'mileage' && <MileageTab />}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// ВКЛАДКА 1: ГЛАВНАЯ (СЧЕТЧИК И ЛЕНТА)
+// ==========================================
+function MainTab() {
+  const [roll, setRoll] = useState(() => parseInt(localStorage.getItem('f7_roll')) || 1);
+  const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('f7_hist')) || []);
+  const [inputVal, setInputVal] = useState("");
+  const pressTimer = useRef(null);
+  const historyEndRef = useRef(null);
+
+  // Сохранение при изменениях
+  useEffect(() => {
+    localStorage.setItem('f7_roll', roll.toString());
+    localStorage.setItem('f7_hist', JSON.stringify(history));
+    if (historyEndRef.current) {
+      historyEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [roll, history]);
+
+  // Логика нажатия на кнопку рулона
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    pressTimer.current = setTimeout(() => {
+      setRoll(1); // Долгое нажатие - сброс
+      pressTimer.current = null;
+    }, 1000);
+  };
+
+  const handlePointerUp = (e) => {
+    e.preventDefault();
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      setRoll(prev => (prev < 4 ? prev + 1 : 1)); // Короткое нажатие - следующий
+    }
+  };
+
+  const handleKey = (key) => {
+    if (key === 'C') {
+      setInputVal("");
+    } else if (key === 'OK') {
+      if (inputVal !== "") {
+        setHistory([...history, inputVal]);
+        setInputVal("");
+      }
+    } else {
+      if (inputVal.length < 6) setInputVal(prev => prev + key);
+    }
+  };
+
+  const deleteItem = (index) => {
+    setHistory(history.filter((_, i) => i !== index));
+  };
+
+  // Цвета для кнопки рулонов
+  const rollColors = {
+    1: 'bg-gradient-to-br from-[#1e293b] to-[#0f172a]',
+    2: 'bg-gradient-to-br from-[#0284c7] to-[#0369a1]',
+    3: 'bg-gradient-to-br from-[#d97706] to-[#b45309]',
+    4: 'bg-gradient-to-br from-[#dc2626] to-[#991b1b] shadow-[0_0_40px_rgba(220,38,38,0.4)] animate-pulse',
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-[#000000]">
+      {/* Кнопка рулона */}
+      <div className="p-4 h-[35%] flex-shrink-0 flex flex-col items-center justify-center">
+        <div 
+          className={`w-full h-full rounded-[32px] flex flex-col items-center justify-center transition-all duration-300 active:scale-95 ${rollColors[roll]}`}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+        >
+          <div className="text-[120px] font-bold leading-none tracking-tighter text-white drop-shadow-xl">{roll}</div>
+          <div className="text-sm font-bold tracking-widest mt-2 text-white/70">
+            {roll === 4 ? "ИНСПЕКЦИЯ" : "РУЛОН (удерживай)"}
+          </div>
+        </div>
+      </div>
+
+      {/* Нижняя зона */}
+      <div className="flex-1 flex flex-col px-4 pb-6 overflow-hidden bg-[#0f172a] rounded-t-[32px] pt-4 border-t border-gray-800">
+        {/* Лента памяти */}
+        <div className="flex-1 overflow-y-auto mb-4 hide-scrollbar flex flex-col gap-2">
+          {history.map((item, index) => (
+            <div 
+              key={index} 
+              className="bg-[#1e293b] rounded-2xl p-4 flex justify-between items-center shadow-md border-l-4 border-l-[#10b981]"
+            >
+              <span className="text-white font-bold text-2xl">{item} м</span>
+              <button 
+                onClick={() => deleteItem(index)}
+                className="bg-red-500/10 text-red-500 w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 active:bg-red-500/30 transition-transform"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </div>
+          ))}
+          <div ref={historyEndRef} />
+        </div>
+
+        {/* Дисплей ввода */}
+        <div className="text-[50px] text-right text-[#10b981] font-light mb-6 tracking-[3px] h-[60px] pr-2">
+          {inputVal || "_"}
+        </div>
+
+        {/* Клавиатура */}
+        <Numpad onKeyPress={handleKey} />
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// ВКЛАДКА 2: МОТАЛКИ (СВОЙСТВА)
+// ==========================================
+function CoilersTab() {
+  const [cutVal, setCutVal] = useState(() => parseInt(localStorage.getItem('f7_cut')) || 5);
+  const [isThick, setIsThick] = useState(() => localStorage.getItem('f7_thick') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('f7_cut', cutVal.toString());
+    localStorage.setItem('f7_thick', isThick.toString());
+  }, [cutVal, isThick]);
+
+  const changeCut = (delta) => {
+    setCutVal(prev => {
+      const next = prev + delta;
+      return next >= 5 && next <= 60 ? next : prev;
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-black p-4">
+      <h2 className="text-3xl font-bold text-white mb-6 mt-2 ml-2">Моталки</h2>
+      
+      <div className="bg-[#1C1C1E] rounded-2xl flex flex-col divide-y divide-gray-800">
+        
+        {/* Stepper */}
+        <div className="p-5 flex justify-between items-center">
+          <div className="text-xl font-semibold text-white">Высечки</div>
+          <div className="flex items-center bg-black rounded-xl p-1">
+            <button 
+              onClick={() => changeCut(-5)}
+              className="w-10 h-10 flex justify-center items-center bg-[#333] text-white rounded-lg active:scale-95 active:bg-[#555] text-2xl font-bold"
+            >-</button>
+            <div className="w-14 text-center font-bold text-2xl text-blue-500">{cutVal}</div>
+            <button 
+              onClick={() => changeCut(5)}
+              className="w-10 h-10 flex justify-center items-center bg-[#333] text-white rounded-lg active:scale-95 active:bg-[#555] text-2xl font-bold"
+            >+</button>
+          </div>
+        </div>
+
+        {/* Toggle */}
+        <div 
+          className="p-5 flex justify-between items-center cursor-pointer active:bg-gray-800/50 transition-colors rounded-b-2xl"
+          onClick={() => setIsThick(!isThick)}
+        >
+          <div className="text-xl font-semibold text-white">Утолщенный</div>
+          <div className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors duration-300 ${isThick ? 'bg-[#32D74B]' : 'bg-[#333]'}`}>
+            <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 ${isThick ? 'translate-x-6' : 'translate-x-0'}`}></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// ВКЛАДКА 3: РАСЧЕТ ПРОБЕГОВ
+// ==========================================
+function MileageTab() {
+  const [activeStand, setActiveStand] = useState(5);
+  const [mInput, setMInput] = useState("");
+
+  const K = {
+    5: 1.000,
+    4: 0.970,
+    3: 0.679,
+    2: 0.475,
+    1: 0.295
+  };
+
+  const handleKey = (key) => {
+    if (key === 'C') {
+      setMInput("");
+    } else if (key !== 'OK') {
+      if (mInput.length < 6) setMInput(prev => prev + key);
+    }
+  };
+
+  // Расчет на лету
+  const val = parseFloat(mInput) || 0;
+  const L5 = val / K[activeStand];
+
+  return (
+    <div className="flex flex-col h-full bg-black px-4 pb-6 pt-4">
+      <h2 className="text-3xl font-bold text-white mb-6 mt-2 ml-2">Пробеги</h2>
+      
+      {/* Список клетей */}
+      <div className="flex-1 flex flex-col gap-3 mb-6 overflow-y-auto hide-scrollbar">
+        {[5, 4, 3, 2, 1].map((stand) => {
+          const isActive = stand === activeStand;
+          const calculatedMeters = (L5 * K[stand]).toFixed(0);
+          const displayInput = isActive ? (mInput || "_") : "-";
+          
+          return (
+            <div 
+              key={stand}
+              onClick={() => { setActiveStand(stand); setMInput(""); }}
+              className={`p-3 rounded-2xl flex justify-between items-center transition-colors border-2 ${
+                isActive ? 'bg-[#002244] border-blue-500' : 'bg-[#1C1C1E] border-transparent'
+              }`}
+            >
+              <div className={`font-bold text-lg w-20 ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                {stand} клеть
+              </div>
+              <div className="flex-1 text-right pr-6 font-bold text-[22px] text-[#32D74B] tracking-wider">
+                {calculatedMeters} м
+              </div>
+              <div className={`min-w-[95px] text-center font-bold text-xl py-2 px-1 rounded-xl border-2 tracking-wider ${
+                isActive ? 'bg-[#0050B3] border-blue-400 text-white' : 'bg-black border-[#333] text-gray-300'
+              }`}>
+                {displayInput}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Клавиатура */}
+      <Numpad onKeyPress={handleKey} />
+    </div>
+  );
+}
+
+// ==========================================
+// ПЕРЕИСПОЛЬЗУЕМЫЙ КОМПОНЕНТ КЛАВИАТУРЫ
+// ==========================================
+function Numpad({ onKeyPress }) {
+  const keys = ['1','2','3','4','5','6','7','8','9','C','0','OK'];
+
+  return (
+    <div className="grid grid-cols-3 gap-3 max-w-[320px] mx-auto w-full flex-shrink-0">
+      {keys.map((k) => (
+        <button 
+          key={k} 
+          onClick={() => onKeyPress(k)}
+          className={`h-16 text-3xl font-medium rounded-[20px] transition-transform active:scale-90 flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_4px_0_#0f172a] active:translate-y-1 active:shadow-none ${
+            k === 'C' ? 'bg-[#7f1d1d] text-[#fca5a5] shadow-[0_4px_0_#450a0a]' :
+            k === 'OK' ? 'bg-[#166534] text-[#86efac] shadow-[0_4px_0_#052e16] font-bold' :
+            'bg-[#1e293b] text-white'
+          }`}
+        >
+          {k}
+        </button>
+      ))}
+    </div>
+  );
+}
